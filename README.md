@@ -1,3 +1,5 @@
+> 🦊 **Aggiornamento:** L’estensione è stata pubblicata su Firefox Add-ons ed è attualmente in attesa di revisione.
+
 # ChatGPT → Markdown (Side Panel)
 
 Estensione Firefox (Manifest V3) che esporta conversazioni ChatGPT in formato Markdown con un semplice clic.
