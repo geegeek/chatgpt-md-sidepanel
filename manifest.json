@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT → Markdown (Side Panel)",
+  "version": "1.0.0",
+  "description": "Esporta conversazioni ChatGPT in Markdown con un clic. Visualizza e copia il contenuto da una tendina laterale in-page.",
+  "author": "Senior Browser Extension Engineer",
+  
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png"
+  },
+  
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "clipboardWrite"
+  ],
+  
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*"
+  ],
+  
+  "background": {
+    "scripts": ["background.js"],
+    "type": "module"
+  },
+  
+  "action": {
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    },
+    "default_title": "Esporta conversazione in Markdown"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "utils/markdown.js",
+        "utils/extractors.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
