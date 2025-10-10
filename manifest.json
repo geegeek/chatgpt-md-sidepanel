@@ -12,7 +12,7 @@
 
   "browser_specific_settings": {
     "gecko": {
-      "id": "chatgpt-md-sidepanel@seniorbrowserextensionengineer",
+      "id": "chatgpt-md-sidepanel@geegeek",
       "strict_min_version": "112.0"
     },
     "gecko_android": {
