@@ -1,81 +1,83 @@
-> 🦊 **Aggiornamento:** L’estensione è stata pubblicata su Firefox Add-ons ed è attualmente in attesa di revisione.
-
 # ChatGPT → Markdown (Side Panel)
 
-Estensione Firefox (Manifest V2) che esporta conversazioni ChatGPT in formato Markdown con un semplice clic.
+> 🦊 **Stato pubblicazione:** l'estensione è stata inviata su Firefox Add-ons ed è attualmente in revisione.
 
-## Caratteristiche
+Estensione Firefox (Manifest V2) pensata per esportare una conversazione di ChatGPT in Markdown con un singolo clic, direttamente dall'interfaccia ufficiale di ChatGPT/ChatGPT.com. Il risultato viene mostrato in una tendina laterale in-page da cui è possibile copiare, aggiornare o chiudere il pannello senza ricaricare la pagina.
 
-- ✨ **Side Panel In-Page**: tendina laterale che si sovrappone alla pagina ChatGPT
-- 📋 **Copia Rapida**: copia il Markdown negli appunti con un clic
-- 🔄 **Aggiornamento Live**: rigenera il contenuto quando necessario
-- 🎯 **Markdown Completo**: supporto per code blocks, tabelle GFM, formattazione inline
-- 🔒 **Privacy First**: tutto funziona in locale, nessuna chiamata esterna
+## ✨ Caratteristiche principali
+- **Side panel contestuale** – Il pannello viene iniettato nella pagina corrente e può essere aperto/chiuso con l'icona dell'estensione.
+- **Aggiornamento on-demand** – Rigenera il Markdown della conversazione ogni volta che apri il pannello o premi "Aggiorna".
+- **Copia negli appunti** – Copia l'intero contenuto Markdown con feedback visivo sullo stato dell'operazione.
+- **Parsing robusto** – I selettori di fallback assicurano la compatibilità con i cambi DOM di ChatGPT.
+- **Serializzazione configurabile** – Supporto per diversi "flavour" Markdown (Base, GFM, Obsidian) con gestione di tabelle, code fence e blocchi matematici.
+- **Privacy by design** – Nessuna chiamata esterna: l'intero export avviene localmente nel browser.
 
-## Installazione
+## 🚀 Installazione
+### Caricamento temporaneo (sviluppo/test)
+1. Apri Firefox e visita `about:debugging`.
+2. Seleziona **Questo Firefox** nella sidebar.
+3. Clicca su **Carica componente aggiuntivo temporaneo…**.
+4. Seleziona il file `manifest.json` contenuto nella cartella del progetto.
+5. Vai su [chat.openai.com](https://chat.openai.com) o [chatgpt.com](https://chatgpt.com) e premi l'icona dell'estensione per aprire il pannello.
 
-### Caricamento Temporaneo (Sviluppo)
+> ℹ️ Fino all'approvazione sullo store, questo è il metodo consigliato per provare l'estensione.
 
-1. Apri Firefox e vai su `about:debugging`
-2. Clicca su "Questo Firefox" nella barra laterale
-3. Clicca su "Carica componente aggiuntivo temporaneo..."
-4. Naviga alla cartella del progetto e seleziona il file `manifest.json`
-5. L'estensione è ora attiva!
+## 🧭 Utilizzo
+1. Apri una conversazione ChatGPT.
+2. Premi l'icona di **ChatGPT → Markdown** nella toolbar di Firefox.
+3. La tendina laterale appare sulla destra con il contenuto formattato in Markdown.
+4. Usa i pulsanti **Aggiorna**, **Copia** o **Chiudi** in base alle necessità.
+5. Cliccando fuori dal pannello questo si chiuderà automaticamente.
 
-### Test
-
-1. Vai su [chat.openai.com](https://chat.openai.com)
-2. Apri una conversazione esistente o avviane una nuova
-3. Clicca sull'icona dell'estensione nella toolbar
-4. Vedrai apparire la tendina laterale con il Markdown della conversazione
-5. Usa i pulsanti per aggiornare, copiare o chiudere
-
-## Struttura del Progetto
-chatgpt-markdown-sidepanel/
-├── manifest.json          # Configurazione estensione
-├── background.js          # Service worker per gestire eventi
-├── content.js             # UI e logica della tendina
+## 🧱 Struttura del progetto
+```
+chatgpt-md-sidepanel/
+├── manifest.json            # Configurazione dell'estensione
+├── background.js            # Gestione click sull'icona e messaggistica
+├── content.js               # Creazione UI, toggle del pannello e interazioni utente
 ├── utils/
-│   ├── markdown.js        # Helper formattazione Markdown
-│   └── extractors.js      # Estrazione contenuto ChatGPT
-└── icons/                 # Icone dell'estensione
-├── icon-48.png
-└── icon-96.png
+│   ├── exporter.js          # Coordinamento export + lettura preferenze flavour
+│   ├── extractors.js        # Selettori resilienti e detection ruolo messaggio
+│   ├── markdown.js          # (legacy) helper vari
+│   └── markdownFlavours.js  # Serializzazione Markdown con più flavour
+└── icons/
+    ├── icon-48.png
+    └── icon-96.png
+```
 
-## Funzionalità Supportate
+## 🧩 Flavour Markdown disponibili
+Il modulo `utils/markdownFlavours.js` espone una mappa `flavours` con tre profili predefiniti:
+- `base`: Markdown minimale con normalizzazione degli spazi (default).
+- `gfm`: GitHub Flavoured Markdown con supporto per tabelle e formule `$…$`.
+- `obsidian`: pensato per Obsidian, evita la compressione delle nuove righe.
 
-### Formattazione Testo
-- **Grassetto**: `**testo**`
-- **Corsivo**: `*testo*`
-- **Grassetto+Corsivo**: `***testo***`
-- **Barrato**: `~~testo~~`
-- **Codice inline**: `` `codice` ``
-- **Link**: `[testo](url)`
-- **Immagini**: `![alt](src)`
+La preferenza viene letta da `browser.storage.sync` (chiave `markdownFlavour`). È possibile modificarla manualmente dalla console del browser:
+```js
+await browser.storage.sync.set({ markdownFlavour: 'gfm' });
+```
+Il prossimo export userà automaticamente il nuovo flavour.
 
-### Strutture Complesse
-- **Intestazioni**: `#` fino a `######`
-- **Liste non ordinate**: `- item`
-- **Liste ordinate**: `1. item`
-- **Task list**: `- [x]` / `- [ ]`
-- **Blockquote**: `> testo`
-- **Tabelle GFM**: supporto completo
-- **Blocchi di codice**: con syntax highlighting
-- **Linee orizzontali**: `---`
+## 🛠️ Debug e sviluppo
+- **Log**: background e content script utilizzano `console.log`/`console.error`; controlla il pannello di debug del componente aggiuntivo per i messaggi.
+- **Hot reload rudimentale**: se il content script non risponde al click, il background forza il `tab.reload()` come fallback.
+- **Script modulari**: `content.js` carica `utils/exporter.js` dinamicamente tramite `import()` per ridurre l'impatto iniziale.
 
-### Elementi Avanzati
-- **Math inline/display**: `$formula$` / `$$formula$$`
-- **Details/Summary**: mantiene HTML nativo
-- **HTML inline**: `<u>`, `<sup>`, `<sub>`, `<kbd>`
+## 🔧 Adattarsi ai cambi DOM di ChatGPT
+Se l'estensione smette di leggere correttamente i messaggi dopo un aggiornamento dell'interfaccia ChatGPT:
+1. Aggiorna l'array `messageSelectors` in `utils/extractors.js` con i nuovi selettori individuati.
+2. Assicurati che `getMarkdownContainer` punti ancora al nodo che contiene il markup della risposta.
+3. Verifica l'estrazione con `window.__exportConversation()` dalla console del sito.
 
-## Adattamento ai Cambi DOM
+## 🔒 Permessi richiesti
+- `activeTab` per interagire con la pagina corrente.
+- `clipboardWrite` per copiare negli appunti.
+- `storage` per ricordare il flavour Markdown preferito.
+- Accesso alle origin `https://chat.openai.com/*` e `https://chatgpt.com/*` dove viene eseguito il content script.
 
-Se ChatGPT aggiorna la sua interfaccia e l'estensione smette di funzionare, modifica i selettori in `utils/extractors.js`:
-```javascript
-// Cerca questa sezione in extractors.js
-const messageSelectors = [
-  '[data-message-author-role]',      // Selettore principale
-  '[data-testid^="conversation-turn"]', // Fallback 1
-  '.group.w-full',                    // Fallback 2
-  'article[class*="message"]'         // Fallback 3
-];
+## ❓ FAQ veloci
+- **Posso usare l'estensione su Chromium?** Attualmente il progetto è ottimizzato per Firefox (Manifest V2). Per Chromium servirebbe il porting a Manifest V3.
+- **È previsto un packaging automatico?** Al momento no: l'installazione temporanea è sufficiente per i test durante la revisione.
+- **Dove segnalare bug/migliorie?** Apri un'issue o contattami dal [blog personale](https://5m1.ovh).
+
+---
+Realizzata con ❤️ per semplificare l'archiviazione delle chat più importanti.
