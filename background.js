@@ -1,6 +1,6 @@
-// background.js - Service Worker per gestire il clic sull'icona
+// background.js - Script di background per gestire il clic sull'icona
 
-browser.action.onClicked.addListener(async (tab) => {
+browser.browserAction.onClicked.addListener(async (tab) => {
   try {
     // Verifica che siamo su ChatGPT
     if (!tab.url.includes('chat.openai.com') && !tab.url.includes('chatgpt.com')) {
@@ -12,10 +12,10 @@ browser.action.onClicked.addListener(async (tab) => {
     await browser.tabs.sendMessage(tab.id, {
       action: 'toggleSidePanel'
     });
-    
+
   } catch (error) {
     console.error('Errore nel background script:', error);
-    
+
     // Se il content script non risponde, potrebbe non essere ancora caricato
     // Ricarica il tab (fallback)
     if (error.message.includes('Receiving end does not exist')) {
@@ -25,4 +25,4 @@ browser.action.onClicked.addListener(async (tab) => {
   }
 });
 
-console.log('ChatGPT → Markdown: Background service worker attivo');
+console.log('ChatGPT → Markdown: Background script attivo');
