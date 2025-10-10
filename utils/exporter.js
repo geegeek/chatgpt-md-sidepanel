@@ -1,6 +1,6 @@
 // utils/exporter.js - Coordinamento export conversazioni in Markdown
 
-import { getMessageNodes, getRole, getMarkdownContainer } from './extractors.js';
+import { detectSite, getExtractor } from './siteRegistry.js';
 import { serializeToMarkdown, DEFAULT_FLAVOUR } from './markdownFlavours.js';
 
 /**
@@ -21,19 +21,36 @@ async function getStoredFlavour() {
 /**
  * Esporta la conversazione corrente in formato Markdown.
  */
-export async function exportConversation(opts = {}) {
-  const { flavour } = opts || {};
+export async function exportConversationForActiveSite({ flavour } = {}) {
+  const siteKey = detectSite(location.href);
+  if (!siteKey) {
+    throw new Error('Unsupported site');
+  }
+
+  const extractor = getExtractor(siteKey);
+  if (!extractor) {
+    throw new Error(`Extractor missing for ${siteKey}`);
+  }
+
+  const nodes = extractor.getMessageNodes(document);
+  const items = nodes.map(node => ({
+    node,
+    role: (typeof extractor.getRole === 'function' ? extractor.getRole(node) : null) || 'assistant',
+    container: typeof extractor.getMarkdownContainer === 'function' ? extractor.getMarkdownContainer(node) : null
+  }));
+
   const storedFlavour = await getStoredFlavour();
   const effectiveFlavour = flavour || storedFlavour || DEFAULT_FLAVOUR;
 
-  const nodes = getMessageNodes(document);
-  const items = nodes.map(node => ({
-    role: getRole(node) || 'assistant',
-    container: getMarkdownContainer(node),
-    node
-  }));
+  const siteSerialize = typeof extractor.serialize === 'function'
+    ? extractor.serialize.bind(extractor)
+    : (_doc, payload, flav) => serializeToMarkdown({ nodes: payload, flavour: flav });
 
-  return serializeToMarkdown({ nodes: items, flavour: effectiveFlavour });
+  return siteSerialize(document, items, effectiveFlavour);
+}
+
+export async function exportConversation(opts = {}) {
+  return exportConversationForActiveSite(opts);
 }
 
 if (typeof window !== 'undefined') {

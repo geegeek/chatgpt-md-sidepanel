@@ -295,22 +295,22 @@
       // Attendi un attimo per far vedere il messaggio
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const { exportConversation } = await loadExporterModule();
-      if (typeof exportConversation !== 'function') {
+      const { exportConversationForActiveSite } = await loadExporterModule();
+      if (typeof exportConversationForActiveSite !== 'function') {
         throw new Error('Funzione di estrazione non disponibile');
       }
 
-      const markdown = await exportConversation();
+      const markdown = await exportConversationForActiveSite({});
 
       if (!markdown || markdown.trim().length === 0) {
-        throw new Error('Nessun contenuto estratto. Assicurati di essere su una conversazione ChatGPT attiva.');
+        throw new Error('Nessun contenuto estratto. Assicurati di essere su una conversazione supportata attiva.');
       }
 
       textareaElement.value = markdown;
-      
+
     } catch (error) {
       console.error('Errore durante la generazione del Markdown:', error);
-      textareaElement.value = `❌ Errore durante l'export:\n\n${error.message}\n\nVerifica di essere su una conversazione ChatGPT attiva e riprova.`;
+      textareaElement.value = `❌ Errore durante l'export:\n\n${error.message}\n\nVerifica di essere su una conversazione supportata attiva e riprova.`;
     }
   }
 

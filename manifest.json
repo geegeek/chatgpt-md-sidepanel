@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "ChatGPT → Markdown (Side Panel)",
-  "version": "1.1.0",
+  "version": "1.2",
   "description": "Esporta conversazioni ChatGPT in Markdown con un clic. Visualizza e copia il contenuto da una tendina laterale in-page.",
   "author": "Senior Browser Extension Engineer",
 
@@ -15,7 +15,11 @@
     "clipboardWrite",
     "storage",
     "https://chat.openai.com/*",
-    "https://chatgpt.com/*"
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://www.perplexity.ai/*",
+    "https://perplexity.ai/*"
   ],
 
   "background": {
@@ -35,7 +39,11 @@
     {
       "matches": [
         "https://chat.openai.com/*",
-        "https://chatgpt.com/*"
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*"
       ],
       "js": [
         "content.js"
