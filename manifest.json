@@ -12,14 +12,15 @@
 
   "browser_specific_settings": {
     "gecko": {
-      "id": "{chatgpt-md-sidepanel@seniorbrowserextensionengineer}",
+      "id": "chatgpt-md-sidepanel@seniorbrowserextensionengineer",
       "strict_min_version": "112.0",
       "data_collection_permissions": {
+        "required": false,
         "collects_telemetry": false
       }
     },
     "gecko_android": {
-      "strict_min_version": "112.0"
+      "strict_min_version": "113.0"
     }
   },
 
