@@ -14,6 +14,14 @@
   let panelElement = null;
   let textareaElement = null;
   let copyButton = null;
+  let exporterModulePromise = null;
+
+  function loadExporterModule() {
+    if (!exporterModulePromise) {
+      exporterModulePromise = import(browser.runtime.getURL('utils/exporter.js'));
+    }
+    return exporterModulePromise;
+  }
 
   // Listener per messaggi dal background
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -287,12 +295,12 @@
       // Attendi un attimo per far vedere il messaggio
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Estrai il Markdown usando la funzione globale
-      if (typeof window.__extractChatGPTToMarkdown !== 'function') {
+      const { exportConversation } = await loadExporterModule();
+      if (typeof exportConversation !== 'function') {
         throw new Error('Funzione di estrazione non disponibile');
       }
 
-      const markdown = window.__extractChatGPTToMarkdown();
+      const markdown = await exportConversation();
 
       if (!markdown || markdown.trim().length === 0) {
         throw new Error('Nessun contenuto estratto. Assicurati di essere su una conversazione ChatGPT attiva.');
