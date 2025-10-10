@@ -10,6 +10,19 @@
     "96": "icons/icon-96.png"
   },
 
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{chatgpt-md-sidepanel@seniorbrowserextensionengineer}",
+      "strict_min_version": "112.0",
+      "data_collection_permissions": {
+        "collects_telemetry": false
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "112.0"
+    }
+  },
+
   "permissions": [
     "activeTab",
     "clipboardWrite",
