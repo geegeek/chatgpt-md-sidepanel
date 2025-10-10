@@ -1,339 +1,153 @@
-// utils/extractors.js - Estrazione contenuto ChatGPT
+// utils/extractors.js - Funzioni di estrazione robuste per ChatGPT
 
-window.__extractChatGPTToMarkdown = function() {
-  const utils = window.__MarkdownUtils;
-  
-  if (!utils) {
-    throw new Error('Markdown utils non disponibili');
+/**
+ * Selettori ordinati per individuare i nodi messaggio nella conversazione.
+ * La lista è mantenuta in ordine di priorità (dal più specifico al più generico).
+ */
+export const messageSelectors = [
+  '[data-message-author-role]',
+  '[data-testid^="conversation-turn"]',
+  '[data-testid="conversation-message"]',
+  '[data-testid="conversation-turn-main"] article',
+  'article[data-testid^="message"]',
+  'div[data-message-id]',
+  '[role="listitem"] [data-message-author-role]',
+  '[role="listitem"] article',
+  '.group.w-full',
+  'article[class*="message"]'
+];
+
+/**
+ * Determina se un elemento è visibile all'interno del documento.
+ */
+function isVisible(element) {
+  if (!element || !(element instanceof Element)) {
+    return false;
+  }
+  if (element.offsetParent === null && element.getClientRects().length === 0) {
+    const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+    if (!style || style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Restituisce un array ordinato di nodi messaggio presenti nel documento.
+ */
+export function getMessageNodes(root = document) {
+  if (!root) {
+    return [];
   }
 
-  /**
-   * Genera header del documento
-   */
-  function generateHeader() {
-    const title = document.title || 'ChatGPT Conversation';
-    const url = window.location.href;
-    const timestamp = new Date().toISOString();
+  const collected = [];
+  const seen = new Set();
 
-    let header = '';
-    header += `# ${title}\n\n`;
-    header += `**Source:** ${url}  \n`;
-    header += `**Exported:** ${timestamp}\n\n`;
-    header += utils.hr() + '\n\n';
-
-    return header;
+  for (const selector of messageSelectors) {
+    const nodes = root.querySelectorAll(selector);
+    for (const node of nodes) {
+      if (!(node instanceof Element)) {
+        continue;
+      }
+      const container = node.closest('[data-message-author-role], article, [data-testid^="conversation-turn"], div[data-message-id]');
+      const candidate = container || node;
+      if (seen.has(candidate)) {
+        continue;
+      }
+      if (!isVisible(candidate)) {
+        continue;
+      }
+      seen.add(candidate);
+      collected.push(candidate);
+    }
   }
 
-  /**
-   * Estrai ruolo del messaggio
-   */
-  function extractRole(element) {
-    const roleAttr = element.getAttribute('data-message-author-role');
-    if (roleAttr) {
-      return roleAttr.toLowerCase();
+  collected.sort((a, b) => {
+    if (a === b) return 0;
+    const position = a.compareDocumentPosition(b);
+    if (position & Node.DOCUMENT_POSITION_PRECEDING) {
+      return 1;
     }
-
-    // Fallback: se contiene .markdown probabilmente è assistant
-    if (element.querySelector('.markdown')) {
-      return 'assistant';
+    if (position & Node.DOCUMENT_POSITION_FOLLOWING) {
+      return -1;
     }
+    return 0;
+  });
 
-    return 'user';
+  return collected;
+}
+
+/**
+ * Prova a determinare il ruolo del messaggio (assistant, user o system).
+ */
+export function getRole(node) {
+  if (!node || !(node instanceof Element)) {
+    return undefined;
   }
 
-  /**
-   * Processa un nodo di testo con formattazione inline
-   */
-  function processInlineFormatting(node, inCodeBlock = false) {
-    if (!node) return '';
-
-    // Testo semplice
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = utils.normalizeWhitespace(node.textContent);
-      return inCodeBlock ? text : text;
-    }
-
-    // Elemento HTML
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const tag = node.tagName.toLowerCase();
-      const children = Array.from(node.childNodes)
-        .map(child => processInlineFormatting(child, inCodeBlock))
-        .join('');
-
-      switch (tag) {
-        case 'br':
-          return '\n';
-        
-        case 'strong':
-        case 'b':
-          if (node.querySelector('em, i')) {
-            return `***${children}***`;
-          }
-          return `**${children}**`;
-        
-        case 'em':
-        case 'i':
-          if (node.querySelector('strong, b')) {
-            return `***${children}***`;
-          }
-          return `*${children}*`;
-        
-        case 's':
-        case 'del':
-        case 'strike':
-          return `~~${children}~~`;
-        
-        case 'code':
-          // Solo se non siamo già in un blocco di codice
-          if (!node.closest('pre')) {
-            return utils.escapeInlineCode(node.textContent);
-          }
-          return node.textContent;
-        
-        case 'a': {
-          const href = node.getAttribute('href') || '';
-          const title = node.getAttribute('title') || '';
-          const text = children || href;
-          return utils.link(text, href, title);
-        }
-        
-        case 'img': {
-          const src = node.getAttribute('src') || '';
-          const alt = node.getAttribute('alt') || '';
-          const title = node.getAttribute('title') || '';
-          return utils.image(alt, src, title);
-        }
-        
-        // Tag HTML inline che lasciamo così
-        case 'u':
-        case 'sup':
-        case 'sub':
-        case 'kbd':
-          return `<${tag}>${children}</${tag}>`;
-        
-        default:
-          return children;
-      }
-    }
-
-    return '';
+  const directRole = node.getAttribute('data-message-author-role') || node.dataset?.role;
+  if (directRole) {
+    return directRole.toLowerCase();
   }
 
-  /**
-   * Processa un elemento blocco (paragrafo, lista, tabella, etc.)
-   */
-  function processBlockElement(element) {
-    if (!element) return '';
-
-    const tag = element.tagName.toLowerCase();
-    let result = '';
-
-    switch (tag) {
-      case 'h1':
-      case 'h2':
-      case 'h3':
-      case 'h4':
-      case 'h5':
-      case 'h6': {
-        const level = parseInt(tag[1]);
-        const text = processInlineFormatting(element);
-        result = utils.heading(level, text) + '\n\n';
-        break;
-      }
-
-      case 'p': {
-        const text = processInlineFormatting(element);
-        if (text.trim()) {
-          result = text + '\n\n';
-        }
-        break;
-      }
-
-      case 'pre': {
-        const codeElement = element.querySelector('code');
-        if (codeElement) {
-          let language = '';
-          const classes = codeElement.className.split(' ');
-          for (const cls of classes) {
-            if (cls.startsWith('language-')) {
-              language = cls.replace('language-', '');
-              break;
-            }
-            if (cls.startsWith('lang-')) {
-              language = cls.replace('lang-', '');
-              break;
-            }
-          }
-
-          // Estrai il codice rimuovendo eventuali numeri di riga
-          let code = codeElement.textContent || '';
-          
-          // Rimuovi common code block prefixes
-          code = code.replace(/^\s*[\d]+\s+/gm, '');
-
-          result = utils.codeBlock(code, language) + '\n\n';
-        } else {
-          result = utils.codeBlock(element.textContent || '') + '\n\n';
-        }
-        break;
-      }
-
-      case 'blockquote': {
-        const lines = processInlineFormatting(element).split('\n');
-        result = lines.map(line => `> ${line}`).join('\n') + '\n\n';
-        break;
-      }
-
-      case 'ul': {
-        const items = Array.from(element.children);
-        items.forEach(item => {
-          if (item.tagName.toLowerCase() === 'li') {
-            const checkbox = item.querySelector('input[type="checkbox"]');
-            if (checkbox) {
-              const checked = checkbox.checked ? 'x' : ' ';
-              result += `- [${checked}] ${processInlineFormatting(item)}\n`;
-            } else {
-              result += `- ${processInlineFormatting(item)}\n`;
-            }
-          }
-        });
-        result += '\n';
-        break;
-      }
-
-      case 'ol': {
-        const items = Array.from(element.children);
-        const start = parseInt(element.getAttribute('start') || '1');
-        items.forEach((item, index) => {
-          if (item.tagName.toLowerCase() === 'li') {
-            result += `${start + index}. ${processInlineFormatting(item)}\n`;
-          }
-        });
-        result += '\n';
-        break;
-      }
-
-      case 'table': {
-        result = utils.tableToMarkdown(element) + '\n\n';
-        break;
-      }
-
-      case 'hr': {
-        result = utils.hr() + '\n\n';
-        break;
-      }
-
-      case 'details': {
-        // Mantieni HTML nativo per details/summary
-        result = element.outerHTML + '\n\n';
-        break;
-      }
-
-      case 'div':
-      case 'section':
-      case 'article': {
-        // Processa ricorsivamente i figli
-        Array.from(element.children).forEach(child => {
-          result += processBlockElement(child);
-        });
-        break;
-      }
-
-      default: {
-        // Fallback: estrai testo con formattazione inline
-        const text = processInlineFormatting(element);
-        if (text.trim()) {
-          result = text + '\n\n';
-        }
-      }
+  const testId = node.getAttribute('data-testid');
+  if (testId) {
+    const match = testId.match(/conversation-turn-?(assistant|user|system)/i) ||
+                  testId.match(/(assistant|user|system)-message/i);
+    if (match) {
+      return match[1].toLowerCase();
     }
-
-    return result;
   }
 
-  /**
-   * Estrai contenuto di un singolo messaggio
-   */
-  function extractMessageContent(messageElement) {
-    let content = '';
-
-    // Cerca il contenitore del messaggio effettivo
-    const contentContainers = [
-      messageElement.querySelector('.markdown'),
-      messageElement.querySelector('[data-message-content]'),
-      messageElement.querySelector('.message-content'),
-      messageElement
-    ].filter(Boolean);
-
-    const container = contentContainers[0];
-    if (!container) return '';
-
-    // Processa tutti gli elementi blocco
-    const blockElements = Array.from(container.children);
-    
-    if (blockElements.length === 0) {
-      // Fallback: nessun figlio, usa il testo diretto
-      content = processInlineFormatting(container);
-    } else {
-      blockElements.forEach(element => {
-        content += processBlockElement(element);
-      });
-    }
-
-    return content.trim();
+  const labelledBy = node.getAttribute('aria-label') || node.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    const label = labelledBy.toLowerCase();
+    if (label.includes('assistant')) return 'assistant';
+    if (label.includes('user')) return 'user';
+    if (label.includes('system')) return 'system';
   }
 
-  /**
-   * Funzione principale di estrazione
-   */
-  function extract() {
-    let markdown = '';
-
-    // Header del documento
-    markdown += generateHeader();
-
-    // Selettori per i messaggi
-    const messageSelectors = [
-      '[data-message-author-role]',
-      '[data-testid^="conversation-turn"]',
-      '.group.w-full',
-      'article[class*="message"]'
-    ];
-
-    let messages = [];
-    for (const selector of messageSelectors) {
-      messages = Array.from(document.querySelectorAll(selector));
-      if (messages.length > 0) break;
-    }
-
-    if (messages.length === 0) {
-      throw new Error('Nessun messaggio trovato nella pagina');
-    }
-
-    // Processa ogni messaggio
-    messages.forEach((msg, index) => {
-      const role = extractRole(msg);
-      const roleLabel = role === 'assistant' ? 'Assistant' : 'User';
-      
-      // Header del messaggio
-      markdown += utils.heading(3, `${index + 1}. ${roleLabel}`) + '\n\n';
-
-      // Contenuto
-      const content = extractMessageContent(msg);
-      if (content) {
-        markdown += content + '\n\n';
-      }
-
-      // Separatore tra messaggi
-      markdown += utils.hr() + '\n\n';
-    });
-
-    // Pulizia finale
-    markdown = utils.collapseEmptyLines(markdown);
-
-    return markdown;
+  const authorBadge = node.querySelector('[data-testid="conversation-turn-badge"], [data-testid="author-role"], [aria-label*="assistant" i], [aria-label*="user" i]');
+  if (authorBadge) {
+    const text = (authorBadge.getAttribute('aria-label') || authorBadge.textContent || '').toLowerCase();
+    if (text.includes('assistant')) return 'assistant';
+    if (text.includes('user')) return 'user';
+    if (text.includes('system')) return 'system';
   }
 
-  // Esegui l'estrazione
-  return extract();
-};
+  return undefined;
+}
+
+/**
+ * Restituisce il nodo che contiene il contenuto markdown del messaggio.
+ */
+export function getMarkdownContainer(node) {
+  if (!node || !(node instanceof Element)) {
+    return null;
+  }
+
+  const containerSelectors = [
+    '[data-testid="markdown"]',
+    '[data-testid="conversation-message-viewport"]',
+    '[data-testid="conversation-content"]',
+    '[data-message-author-role] [data-message-author-role]',
+    '[data-role="message-content"]',
+    '[role="presentation"] [data-testid="markdown"]',
+    '[data-testid="assistant-response"]',
+    '.markdown'
+  ];
+
+  for (const selector of containerSelectors) {
+    if (node.matches(selector)) {
+      return node;
+    }
+    const found = node.querySelector(selector);
+    if (found) {
+      return found;
+    }
+  }
+
+  const fallback = node.querySelector('pre, code, table, p, li, h1, h2, h3, h4, h5, h6, blockquote');
+  return fallback || node;
+}
