@@ -25,4 +25,5 @@ browser.browserAction.onClicked.addListener(async (tab) => {
   }
 });
 
+
 console.log('ChatGPT → Markdown: Background script attivo');
