@@ -256,7 +256,7 @@
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('[Content] Message received:', message);
 
-    if (message.action === 'toggle') {
+    if (message.action === 'toggleSidePanel') {
       togglePanel();
       sendResponse({ success: true });
     }
