@@ -22,7 +22,7 @@ export async function exportConversation() {
   console.log('[Exporter] Platform:', platformName);
   
   // Extract messages
-  const messages = getAllMessages();
+  const messages = await getAllMessages();
   
   if (!messages || messages.length === 0) {
     throw new Error('No messages found in the conversation');
