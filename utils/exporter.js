@@ -1,58 +1,75 @@
-// utils/exporter.js - Coordinamento export conversazioni in Markdown
+// utils/exporter.js
+// Coordinates the export of the conversation to Markdown
 
-import { detectSite, getExtractor } from './siteRegistry.js';
-import { serializeToMarkdown, DEFAULT_FLAVOUR } from './markdownFlavours.js';
+import { getAllMessages, detectPlatform } from './extractors.js';
+import { flavours } from './markdownFlavours.js';
 
 /**
- * Recupera la preferenza di flavour salvata in storage sincronizzato.
+ * Exports the entire conversation in Markdown format
+ * @returns {Promise<string>} The generated Markdown
  */
-async function getStoredFlavour() {
+export async function exportConversation() {
+  console.log('[Exporter] Starting conversation export');
+  
+  // Detect platform
+  const platform = detectPlatform();
+  const platformName = {
+    'chatgpt': 'ChatGPT',
+    'perplexity': 'Perplexity',
+    'claude': 'Claude'
+  }[platform] || 'AI Chat';
+  
+  console.log('[Exporter] Platform:', platformName);
+  
+  // Extract messages
+  const messages = getAllMessages();
+  
+  if (!messages || messages.length === 0) {
+    throw new Error('No messages found in the conversation');
+  }
+  
+  console.log(`[Exporter] Found ${messages.length} messages`);
+  
+  // Read Markdown flavour preference
+  const flavourKey = await getMarkdownFlavour();
+  const serializer = flavours[flavourKey] || flavours.base;
+  
+  console.log('[Exporter] Markdown flavour:', flavourKey);
+  
+  // Generate document header
+  let markdown = `# ${platformName} Conversation\n\n`;
+  markdown += `**Exported on:** ${new Date().toLocaleString('en-US')}\n`;
+  markdown += `**URL:** ${window.location.href}\n`;
+  markdown += `**Platform:** ${platformName}\n\n`;
+  markdown += `---\n\n`;
+  
+  // Serialize each message
+  messages.forEach((msg, index) => {
+    const roleLabel = msg.role === 'user' 
+      ? '👤 User' 
+      : `🤖 ${platformName}`;
+    
+    markdown += `## ${roleLabel}\n\n`;
+    markdown += serializer.serialize(msg.content);
+    markdown += '\n\n';
+    markdown += `---\n\n`;
+  });
+  
+  console.log(`[Exporter] Export completed, length: ${markdown.length} characters`);
+  
+  return markdown;
+}
+
+/**
+ * Reads the saved Markdown flavour preference
+ * @returns {Promise<string>} The selected flavour (default: 'base')
+ */
+async function getMarkdownFlavour() {
   try {
     const result = await browser.storage.sync.get('markdownFlavour');
-    if (result && typeof result.markdownFlavour === 'string') {
-      return result.markdownFlavour;
-    }
-  } catch (error) {
-    console.warn('Impossibile leggere markdownFlavour da storage:', error);
+    return result.markdownFlavour || 'base';
+  } catch (e) {
+    console.warn('[Exporter] Unable to read flavour preference, using base', e);
+    return 'base';
   }
-  return DEFAULT_FLAVOUR;
-}
-
-/**
- * Esporta la conversazione corrente in formato Markdown.
- */
-export async function exportConversationForActiveSite({ flavour } = {}) {
-  const siteKey = detectSite(location.href);
-  if (!siteKey) {
-    throw new Error('Unsupported site');
-  }
-
-  const extractor = getExtractor(siteKey);
-  if (!extractor) {
-    throw new Error(`Extractor missing for ${siteKey}`);
-  }
-
-  const nodes = extractor.getMessageNodes(document);
-  const items = nodes.map(node => ({
-    node,
-    role: (typeof extractor.getRole === 'function' ? extractor.getRole(node) : null) || 'assistant',
-    container: typeof extractor.getMarkdownContainer === 'function' ? extractor.getMarkdownContainer(node) : null
-  }));
-
-  const storedFlavour = await getStoredFlavour();
-  const effectiveFlavour = flavour || storedFlavour || DEFAULT_FLAVOUR;
-
-  const siteSerialize = typeof extractor.serialize === 'function'
-    ? extractor.serialize.bind(extractor)
-    : (_doc, payload, flav) => serializeToMarkdown({ nodes: payload, flavour: flav });
-
-  return siteSerialize(document, items, effectiveFlavour);
-}
-
-export async function exportConversation(opts = {}) {
-  return exportConversationForActiveSite(opts);
-}
-
-if (typeof window !== 'undefined') {
-  window.__exportConversation = exportConversation;
 }

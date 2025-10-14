@@ -1,0 +1,61 @@
+{
+  "version": "1.2.0",
+  "last_updated": "2025-10-14",
+  "platforms": {
+    "chatgpt": {
+      "message_selectors": [
+        "div[data-message-author-role]",
+        "div.group.w-full",
+        "article[data-testid^='conversation-turn']",
+        "div[class*='ConversationItem']"
+      ],
+      "role_detection": {
+        "data_attribute": "data-message-author-role",
+        "user_indicators": ["img[alt*='User']", ".user"],
+        "assistant_indicators": ["img[alt*='ChatGPT']", "svg"]
+      },
+      "content_container": [
+        ".markdown",
+        ".prose",
+        "[class*='markdown']"
+      ]
+    },
+    "perplexity": {
+      "container": ["main", "div[class*='Thread']"],
+      "user_query": [
+        "div[class*='UserQuery']",
+        "div.col-span-10",
+        "div[class*='QueryText']"
+      ],
+      "answer": [
+        "div[class*='prose']",
+        "div[class*='Answer']",
+        "div[class*='ResponseText']"
+      ],
+      "message_block": [
+        "div[class*='mb-md']",
+        "div[class*='MessagePair']"
+      ]
+    },
+    "claude": {
+      "user_message": [
+        "[data-testid='user-message']",
+        "div.font-user-message",
+        "div[class*='UserMessage']"
+      ],
+      "assistant_message": [
+        "[data-testid='assistant-message']",
+        "div.font-claude-message",
+        "div[class*='AssistantMessage']"
+      ],
+      "message_group": [
+        "[data-testid='message-group']",
+        "div[class*='MessageGroup']"
+      ],
+      "message_content": [
+        "div[class*='prose']",
+        "div[class*='markdown']"
+      ]
+    }
+  }
+}

@@ -1,355 +1,270 @@
-// content.js - Gestione UI della tendina laterale
+// content.js
+// Creates and manages the side panel for Markdown export
 
-(function() {
-  'use strict';
+(async function() {
+  console.log('[Content] Script initialized');
 
-  // Flag per evitare doppia inizializzazione
-  if (window.__CTMDP_READY__) {
-    console.log('ChatGPT → Markdown: già inizializzato');
-    return;
-  }
-  window.__CTMDP_READY__ = true;
+  // Dynamically import utilities
+  const { exportConversation } = await import(browser.runtime.getURL('utils/exporter.js'));
+  const { detectPlatform } = await import(browser.runtime.getURL('utils/extractors.js'));
 
-  const PANEL_ID = 'chatgpt-markdown-sidepanel';
-  let panelElement = null;
-  let textareaElement = null;
-  let copyButton = null;
-  let exporterModulePromise = null;
+  // Detect platform and set color
+  const platform = detectPlatform();
+  console.log('[Content] Detected platform:', platform);
+  
+  const platformConfig = {
+    'chatgpt': { name: 'ChatGPT', color: '#10a37f' },
+    'perplexity': { name: 'Perplexity', color: '#20808d' },
+    'claude': { name: 'Claude', color: '#cc785c' }
+  };
+  
+  const config = platformConfig[platform] || { name: 'AI Chat', color: '#10a37f' };
+  const platformColor = config.color;
+  const platformName = config.name;
 
-  function loadExporterModule() {
-    if (!exporterModulePromise) {
-      exporterModulePromise = import(browser.runtime.getURL('utils/exporter.js'));
-    }
-    return exporterModulePromise;
-  }
-
-  // Listener per messaggi dal background
-  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === 'toggleSidePanel') {
-      togglePanel();
-      sendResponse({ success: true });
-    }
-    return true;
-  });
+  // Variable to track the panel
+  let sidePanel = null;
 
   /**
-   * Toggle del pannello: crea/apri/rigenera
-   */
-  function togglePanel() {
-    if (!panelElement) {
-      createPanel();
-      openPanel();
-      generateMarkdown();
-    } else {
-      if (isPanelOpen()) {
-        // Se già aperto, rigenera
-        generateMarkdown();
-      } else {
-        // Se chiuso, apri e rigenera
-        openPanel();
-        generateMarkdown();
-      }
-    }
-  }
-
-  /**
-   * Crea la struttura DOM del pannello
+   * Creates the HTML side panel
    */
   function createPanel() {
-    // Container principale
     const panel = document.createElement('div');
-    panel.id = PANEL_ID;
+    panel.id = 'chatgpt-md-sidepanel';
     panel.style.cssText = `
       position: fixed;
       top: 0;
       right: 0;
-      width: min(48vw, 720px);
+      width: 400px;
       height: 100vh;
-      background: #ffffff;
-      border-left: 1px solid #d1d5db;
-      box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+      background: white;
+      border-left: 3px solid ${platformColor};
+      box-shadow: -2px 0 10px rgba(0,0,0,0.1);
       z-index: 999999;
-      display: flex;
+      display: none;
       flex-direction: column;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      transform: translateX(100%);
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     `;
 
-    // Previeni la propagazione dei click all'interno del pannello
-    panel.addEventListener('click', (e) => {
-      e.stopPropagation();
-    });
+    panel.innerHTML = `
+      <div style="padding: 20px; background: ${platformColor}; color: white; position: relative;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600;">
+          ${platformName} → Markdown
+        </h2>
+        <button id="close-panel" style="
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          background: transparent;
+          border: none;
+          color: white;
+          font-size: 24px;
+          cursor: pointer;
+          line-height: 1;
+          padding: 0;
+          width: 24px;
+          height: 24px;
+        ">×</button>
+      </div>
 
-    // Header
-    const header = document.createElement('div');
-    header.style.cssText = `
-      padding: 16px 20px;
-      background: #f9fafb;
-      border-bottom: 1px solid #e5e7eb;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
+      <div style="padding: 20px; flex: 1; overflow-y: auto; background: #f9f9f9;">
+        <pre id="markdown-content" style="
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+          font-size: 12px;
+          line-height: 1.5;
+          margin: 0;
+          background: white;
+          padding: 15px;
+          border-radius: 5px;
+          border: 1px solid #e0e0e0;
+        "></pre>
+      </div>
+
+      <div style="
+        padding: 20px;
+        border-top: 1px solid #ddd;
+        display: flex;
+        gap: 10px;
+        background: white;
+      ">
+        <button id="refresh-md" style="
+          flex: 1;
+          padding: 12px;
+          background: ${platformColor};
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          transition: opacity 0.2s;
+        ">🔄 Refresh</button>
+        
+        <button id="copy-md" style="
+          flex: 1;
+          padding: 12px;
+          background: #4CAF50;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          transition: opacity 0.2s;
+        ">📋 Copy</button>
+      </div>
     `;
-
-    const title = document.createElement('h3');
-    title.textContent = 'Markdown Export';
-    title.style.cssText = `
-      margin: 0;
-      font-size: 16px;
-      font-weight: 600;
-      color: #111827;
-    `;
-
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.cssText = `
-      display: flex;
-      gap: 8px;
-    `;
-
-    // Bottone Aggiorna
-    const refreshButton = createButton('Aggiorna', '#3b82f6');
-    refreshButton.addEventListener('click', generateMarkdown);
-
-    // Bottone Copia
-    copyButton = createButton('Copia', '#10b981');
-    copyButton.addEventListener('click', copyToClipboard);
-
-    // Bottone Chiudi
-    const closeButton = createButton('Chiudi', '#ef4444');
-    closeButton.addEventListener('click', closePanel);
-
-    buttonContainer.appendChild(refreshButton);
-    buttonContainer.appendChild(copyButton);
-    buttonContainer.appendChild(closeButton);
-
-    header.appendChild(title);
-    header.appendChild(buttonContainer);
-
-    // Textarea per il contenuto
-    const textarea = document.createElement('textarea');
-    textarea.readOnly = true;
-    textarea.style.cssText = `
-      flex: 1;
-      width: 100%;
-      padding: 20px;
-      border: none;
-      resize: none;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      color: #1f2937;
-      background: #ffffff;
-      outline: none;
-    `;
-    textarea.placeholder = 'Il Markdown apparirà qui...';
-
-    // Footer con link al blog
-    const footer = document.createElement('div');
-    footer.style.cssText = `
-      padding: 12px 20px;
-      background: #f9fafb;
-      border-top: 1px solid #e5e7eb;
-      text-align: center;
-      flex-shrink: 0;
-      font-size: 13px;
-      color: #6b7280;
-    `;
-
-    const footerText = document.createElement('span');
-    footerText.textContent = 'Ti è piaciuta questa estensione? ';
-    footerText.style.cssText = `
-      color: #6b7280;
-    `;
-
-    const blogLink = document.createElement('a');
-    blogLink.href = 'https://5m1.ovh';
-    blogLink.target = '_blank';
-    blogLink.rel = 'noopener noreferrer';
-    blogLink.textContent = 'Visita il mio blog';
-    blogLink.style.cssText = `
-      color: #3b82f6;
-      text-decoration: none;
-      font-weight: 500;
-      transition: color 0.2s;
-    `;
-    blogLink.addEventListener('mouseenter', () => {
-      blogLink.style.color = '#2563eb';
-      blogLink.style.textDecoration = 'underline';
-    });
-    blogLink.addEventListener('mouseleave', () => {
-      blogLink.style.color = '#3b82f6';
-      blogLink.style.textDecoration = 'none';
-    });
-
-    const heartIcon = document.createElement('span');
-    heartIcon.textContent = ' ❤️';
-    heartIcon.style.cssText = `
-      color: #ef4444;
-    `;
-
-    footer.appendChild(footerText);
-    footer.appendChild(blogLink);
-    footer.appendChild(heartIcon);
-
-    panel.appendChild(header);
-    panel.appendChild(textarea);
-    panel.appendChild(footer);
 
     document.body.appendChild(panel);
-
-    panelElement = panel;
-    textareaElement = textarea;
-
-    // Aggiungi listener per chiusura al click fuori dal pannello
-    setupClickOutsideListener();
+    console.log('[Content] Panel created and added to DOM');
+    return panel;
   }
 
   /**
-   * Setup del listener per chiudere il pannello cliccando fuori
+   * Shows or hides the panel
    */
-  function setupClickOutsideListener() {
-    const clickOutsideHandler = (e) => {
-      // Verifica se il pannello è aperto
-      if (!isPanelOpen()) {
-        return;
-      }
+  function togglePanel() {
+    if (!sidePanel) {
+      sidePanel = createPanel();
+      attachEventListeners();
+    }
 
-      // Se il click è fuori dal pannello, chiudi
-      if (panelElement && !panelElement.contains(e.target)) {
-        closePanel();
-      }
-    };
-
-    // Usa capture phase per intercettare prima
-    document.addEventListener('click', clickOutsideHandler, true);
-
-    // Salva il riferimento per poterlo rimuovere se necessario
-    panelElement._clickOutsideHandler = clickOutsideHandler;
-  }
-
-  /**
-   * Crea un bottone stilizzato
-   */
-  function createButton(text, bgColor) {
-    const button = document.createElement('button');
-    button.textContent = text;
-    button.style.cssText = `
-      padding: 8px 16px;
-      background: ${bgColor};
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    `;
-    button.addEventListener('mouseenter', () => {
-      button.style.opacity = '0.9';
-    });
-    button.addEventListener('mouseleave', () => {
-      button.style.opacity = '1';
-    });
-    return button;
-  }
-
-  /**
-   * Apre il pannello con animazione
-   */
-  function openPanel() {
-    if (panelElement) {
-      panelElement.style.transform = 'translateX(0)';
+    const isVisible = sidePanel.style.display === 'flex';
+    
+    if (isVisible) {
+      sidePanel.style.display = 'none';
+      console.log('[Content] Panel hidden');
+    } else {
+      sidePanel.style.display = 'flex';
+      console.log('[Content] Panel shown');
+      refreshMarkdown();
     }
   }
 
   /**
-   * Chiude il pannello con animazione
+   * Updates the Markdown content
    */
-  function closePanel() {
-    if (panelElement) {
-      panelElement.style.transform = 'translateX(100%)';
-    }
-  }
+  async function refreshMarkdown() {
+    const contentElement = document.getElementById('markdown-content');
+    if (!contentElement) return;
 
-  /**
-   * Verifica se il pannello è aperto
-   */
-  function isPanelOpen() {
-    if (!panelElement) return false;
-    return panelElement.style.transform === 'translateX(0px)' || 
-           panelElement.style.transform === 'translateX(0)';
-  }
-
-  /**
-   * Genera il Markdown della conversazione
-   */
-  async function generateMarkdown() {
-    if (!textareaElement) return;
-
-    // Mostra messaggio di caricamento
-    textareaElement.value = 'Generazione Markdown in corso...\n\nEstrazione della conversazione...';
+    contentElement.textContent = 'Loading...';
+    console.log('[Content] Markdown export in progress...');
 
     try {
-      // Attendi un attimo per far vedere il messaggio
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      const { exportConversationForActiveSite } = await loadExporterModule();
-      if (typeof exportConversationForActiveSite !== 'function') {
-        throw new Error('Funzione di estrazione non disponibile');
-      }
-
-      const markdown = await exportConversationForActiveSite({});
-
-      if (!markdown || markdown.trim().length === 0) {
-        throw new Error('Nessun contenuto estratto. Assicurati di essere su una conversazione supportata attiva.');
-      }
-
-      textareaElement.value = markdown;
-
+      const markdown = await exportConversation();
+      contentElement.textContent = markdown;
+      console.log('[Content] Export completed, characters:', markdown.length);
     } catch (error) {
-      console.error('Errore durante la generazione del Markdown:', error);
-      textareaElement.value = `❌ Errore durante l'export:\n\n${error.message}\n\nVerifica di essere su una conversazione supportata attiva e riprova.`;
+      console.error('[Content] Error during export:', error);
+      contentElement.textContent = `❌ Error: ${error.message}`;
     }
   }
 
   /**
-   * Copia il contenuto negli appunti
+   * Copies Markdown to clipboard
    */
   async function copyToClipboard() {
-    if (!textareaElement || !copyButton) return;
-
-    const content = textareaElement.value;
+    const contentElement = document.getElementById('markdown-content');
+    const copyButton = document.getElementById('copy-md');
     
-    if (!content || content.includes('Errore durante l\'export')) {
-      return;
-    }
+    if (!contentElement || !copyButton) return;
+
+    const originalText = copyButton.textContent;
 
     try {
-      await navigator.clipboard.writeText(content);
-      
-      // Feedback visivo
-      const originalText = copyButton.textContent;
-      copyButton.textContent = '✓ Copiato!';
-      copyButton.style.background = '#059669';
-      
+      await navigator.clipboard.writeText(contentElement.textContent);
+      copyButton.textContent = '✅ Copied!';
+      copyButton.style.background = '#2196F3';
+      console.log('[Content] Markdown copied to clipboard');
+
       setTimeout(() => {
         copyButton.textContent = originalText;
-        copyButton.style.background = '#10b981';
-      }, 1500);
-      
+        copyButton.style.background = '#4CAF50';
+      }, 2000);
     } catch (error) {
-      console.error('Errore durante la copia:', error);
-      copyButton.textContent = '✗ Errore';
-      copyButton.style.background = '#dc2626';
-      
+      console.error('[Content] Copy error:', error);
+      copyButton.textContent = '❌ Error';
+      copyButton.style.background = '#f44336';
+
       setTimeout(() => {
-        copyButton.textContent = 'Copia';
-        copyButton.style.background = '#10b981';
-      }, 1500);
+        copyButton.textContent = originalText;
+        copyButton.style.background = '#4CAF50';
+      }, 2000);
     }
   }
 
-  console.log('ChatGPT → Markdown: Content script caricato');
+  /**
+   * Closes the panel
+   */
+  function closePanel() {
+    if (sidePanel) {
+      sidePanel.style.display = 'none';
+      console.log('[Content] Panel closed');
+    }
+  }
+
+  /**
+   * Attaches listeners to button events
+   */
+  function attachEventListeners() {
+    const refreshBtn = document.getElementById('refresh-md');
+    const copyBtn = document.getElementById('copy-md');
+    const closeBtn = document.getElementById('close-panel');
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', refreshMarkdown);
+    }
+
+    if (copyBtn) {
+      copyBtn.addEventListener('click', copyToClipboard);
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closePanel);
+    }
+
+    // Close panel when clicking outside
+    document.addEventListener('click', (e) => {
+      if (sidePanel && sidePanel.style.display === 'flex') {
+        if (!sidePanel.contains(e.target)) {
+          closePanel();
+        }
+      }
+    });
+
+    // Hover effect on buttons
+    [refreshBtn, copyBtn].forEach(btn => {
+      if (btn) {
+        btn.addEventListener('mouseenter', () => {
+          btn.style.opacity = '0.9';
+        });
+        btn.addEventListener('mouseleave', () => {
+          btn.style.opacity = '1';
+        });
+      }
+    });
+
+    console.log('[Content] Event listeners attached');
+  }
+
+  /**
+   * Listener for messages from background script
+   */
+  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('[Content] Message received:', message);
+
+    if (message.action === 'toggle') {
+      togglePanel();
+      sendResponse({ success: true });
+    }
+  });
+
+  console.log('[Content] Message listener active');
+
+  // Expose global function for debugging
+  window.__exportConversation = exportConversation;
+  console.log('[Content] Function __exportConversation exposed for debugging');
 })();
