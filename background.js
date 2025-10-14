@@ -1,6 +1,12 @@
 // background.js - Script di background per gestire il clic sull'icona
 
-browser.browserAction.onClicked.addListener(async (tab) => {
+const actionAPI = browser.browserAction || browser.action;
+
+if (!actionAPI) {
+  console.error('Browser action API not available');
+}
+
+actionAPI?.onClicked.addListener(async (tab) => {
   try {
     // Verifica che siamo su ChatGPT
     if (!tab.url.includes('chat.openai.com') && !tab.url.includes('chatgpt.com')) {

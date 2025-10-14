@@ -33,12 +33,12 @@
         "https://www.perplexity.ai/*",
         "https://claude.ai/*"
       ],
-      "js": ["content.js"]
+      "js": ["browser-polyfill.js", "content.js"]
     }
   ],
   
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["browser-polyfill.js", "background.js"]
   },
   
   "browser_action": {
