@@ -1,8 +1,8 @@
 # ChatGPT → Markdown (Side Panel)
 
-> ℹ️ **Versione 1.1** – Questa release introduce un'ulteriore robustezza contro i cambiamenti del DOM di ChatGPT, così l'export rimane affidabile anche dopo gli aggiornamenti dell'interfaccia.
+> ℹ️ **Versione 1.2** – Questa release introduce un'ulteriore robustezza contro i cambiamenti del DOM di ChatGPT, così l'export rimane affidabile anche dopo gli aggiornamenti dell'interfaccia.
 
-> 🦊 **Stato pubblicazione:**  l'estensione è stata inviata su Firefox Add-ons ed è attualmente in revisione.
+> 🦊 Disponibile ora su [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/chatgpt-markdown-side-panel/)
 
 Estensione Firefox (Manifest V2) pensata per esportare una conversazione di ChatGPT in Markdown con un singolo clic, direttamente dall'interfaccia ufficiale di ChatGPT/ChatGPT.com. Il risultato viene mostrato in una tendina laterale in-page da cui è possibile copiare, aggiornare o chiudere il pannello senza ricaricare la pagina.
 
